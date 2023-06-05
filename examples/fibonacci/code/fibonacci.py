@@ -1,3 +1,8 @@
+"""
+This file contains the code for the fibonacci example.
+"""
+
+
 def fibonacci(n: int) -> int:
     """
     Computes and returns the nth Fibonacci number.
