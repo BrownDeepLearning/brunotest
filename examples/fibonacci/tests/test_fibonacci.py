@@ -1,10 +1,17 @@
+"""
+Contains the test cases for the fibonacci example.
+"""
+
 import unittest
 from gradescope_utils.autograder_utils.decorators import number, weight
-import os
 from brunotest import import_solution_module, import_student_module
 
 
 class TestFibonacci(unittest.TestCase):
+    """
+    Tests the `fibonacci` function.
+    """
+
     @number("1")
     @weight(25)
     def test_base_cases(self):
