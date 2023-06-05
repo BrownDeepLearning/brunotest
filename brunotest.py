@@ -113,7 +113,7 @@ def find_chaff_paths(directory: str) -> list[str]:
 
 
 def compile_to_directory(
-    code_path: str, chaff_path: str, output_directory: str
+    code_path: str, chaff_path: Optional[str], output_directory: str
 ) -> None:
     """
     Compiles all of the template files from `code_path` to the specified output directory.
@@ -361,7 +361,7 @@ def brunotest_cli_entry(  # pylint: disable=too-many-locals
     chaff_names = [
         os.path.basename(chaff_path).split(".")[0] for chaff_path in chaff_paths
     ]
-    chaff_path_name = (
+    chaff_path_name: list[tuple[Optional[str], str]] = (
         list(zip(chaff_paths, chaff_names))
         + [(stencil_path, "stencil")]
         + [(None, "solution")]

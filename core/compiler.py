@@ -20,7 +20,7 @@ class FileCompilationResult:
     regions: list[str]
 
 
-def find_region(template: str, search_start: str = 0) -> Optional[tuple[int, int, str]]:
+def find_region(template: str, search_start: int = 0) -> Optional[tuple[int, int, str]]:
     """
     Finds the next region in the template file, starting at the given index.
     """
@@ -42,7 +42,7 @@ def compile_file(
     template_file_path: str,
     new_file_path: str,
     replacements: dict[str, str],
-) -> FileCompilationResult:
+) -> None:
     """
     Reads and compiles a template file, writing the result to a new file.
     """
@@ -88,11 +88,14 @@ def compile_file(
         new_file.write(template)
 
 
-def read_chaff_file(chaff_file_path: str) -> dict[str, str]:
+def read_chaff_file(chaff_file_path: Optional[str]) -> dict[str, str]:
     """
     Reads a chaff file and creates a mapping between regions and their replacements.
     """
     # Read the chaff file
+    if not chaff_file_path:
+        return {}
+
     with open(chaff_file_path, "r", encoding="utf-8") as chaff_file:
         chaff = chaff_file.read()
 
