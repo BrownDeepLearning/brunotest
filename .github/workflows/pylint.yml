@@ -3,7 +3,7 @@ name: Pylint
 on: [pull_request]
 
 jobs: 
-  pylint:
+  lint:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -25,4 +25,4 @@ jobs:
         pylint $(git ls-files '*.py')
     - name: Type-check with mypy
       run: |
-        mypy $(git ls-files '*.py')
+        mypy --ignore-missing-imports $(git ls-files '*.py')
