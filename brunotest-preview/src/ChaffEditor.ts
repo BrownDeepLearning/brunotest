@@ -8,8 +8,8 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
 
     //* NOTE: Must match the name exposed in package.json *//
     public static readonly viewType = "brunotest-preview.chaff";
-    public static readonly REGION_START_STRING = "### Region: ";
-    public static readonly REGION_END_STRING = "### EndRegion";
+    public static readonly regionStartString = "### Region: ";
+    public static readonly regionEndString = "### EndRegion";
 
     public static register(
         context: vscode.ExtensionContext
@@ -26,6 +26,8 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
         webviewPanel: vscode.WebviewPanel,
         _token: vscode.CancellationToken
     ): Promise<void> {
+        let selectedDocument: string | undefined = undefined;
+
         // Open the document in the default text editor
         const srcDir = vscode.Uri.joinPath(this.context.extensionUri, "src");
         webviewPanel.webview.options = {
@@ -35,40 +37,53 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
 
         vscode.window.showTextDocument(document, vscode.ViewColumn.One);
 
+        const updateWebview = () => {
+            this.getHTMLForWebview(
+                document,
+                webviewPanel.webview,
+                selectedDocument
+            ).then((html) => {
+                webviewPanel.webview.html = html;
+                console.log(webviewPanel.webview.html);
+            });
+        };
+
         // Create and show the webview panel
-        this.getHTMLForWebview(document, webviewPanel.webview).then(
-            (html) => (webviewPanel.webview.html = html)
-        );
+        updateWebview();
         webviewPanel.reveal(vscode.ViewColumn.Two);
 
-        let selectedDocument: string | undefined = undefined;
+        const subscriptions: vscode.Disposable[] = [];
 
-        const changeDocumentSubscription =
+        subscriptions.push(
             vscode.workspace.onDidChangeTextDocument(async (e) => {
                 if (e.document.uri.toString() === document.uri.toString()) {
-                    this.getHTMLForWebview(
-                        document,
-                        webviewPanel.webview,
-                        selectedDocument
-                    ).then((html) => (webviewPanel.webview.html = html));
+                    updateWebview();
                 }
-            });
+            })
+        );
+
+        subscriptions.push(
+            vscode.workspace.onDidCloseTextDocument(async (e) => {})
+        );
+
+        subscriptions.push(vscode.workspace.onDidCreateFiles(async (e) => {}));
+
+        subscriptions.push(vscode.workspace.onDidDeleteFiles(async (e) => {}));
+
+        subscriptions.push(vscode.workspace.onDidRenameFiles(async (e) => {}));
 
         webviewPanel.webview.onDidReceiveMessage((message) => {
             switch (message.command) {
-                case "fileChange":
+                case "selectedFileChange":
+                    console.log("selectedFileChange");
                     selectedDocument = message.selectedDocument;
-                    this.getHTMLForWebview(
-                        document,
-                        webviewPanel.webview,
-                        selectedDocument
-                    ).then((html) => (webviewPanel.webview.html = html));
+                    updateWebview();
             }
         });
 
         // Make sure we get rid of the listener when our editor is closed.
         webviewPanel.onDidDispose(() => {
-            changeDocumentSubscription.dispose();
+            subscriptions.forEach((subscription) => subscription.dispose());
         });
     }
 
@@ -96,12 +111,13 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
                 }>${file}</option>`
         );
         const fileDropdown = `
-        <select id="file-dropdown">
-            <option disabled ${
-                selectedDocument ? "" : "selected"
-            }>Choose File!</option>
-            ${dropdownOptions.join("\n")}
-        </select>`;
+            <select id="file-dropdown" class="monaco-select-box monaco-select-box-dropdown-padding">
+                <option disabled ${
+                    selectedDocument ? "" : "selected"
+                }>Choose File!</option>
+                ${dropdownOptions.join("\n")}
+            </select>
+        </div>`;
         const dropdownEventListener = `
         <script>
             const vscode = acquireVsCodeApi();
@@ -109,7 +125,7 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
 
             dropdown.addEventListener("change", () => {
                 vscode.postMessage({
-                    command: "fileChange",
+                    command: "selectedFileChange",
                     selectedDocument: dropdown.value
                 });
             });
@@ -137,7 +153,6 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
         return this.wrapHTMLBoilerplate(
             webview,
             `
-            ${fileDropdown}
             ${await getHighlighter({ theme: highlightTheme })
                 .then((highligher) =>
                     highligher.codeToHtml(modifiedFileContents, {
@@ -145,6 +160,7 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
                     })
                 )
                 .catch((err) => console.error(err))}
+            ${fileDropdown}
             ${dropdownEventListener}
             `
         );
@@ -162,6 +178,7 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+            <link rel="stylesheet" href="https://unpkg.com/monaco-editor@latest/min/vs/editor/editor.main.css">
             <link rel="stylesheet" href="${webviewCssUri}" />
             <title>Brunotest Preview</title>
         </head>
@@ -177,7 +194,7 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
         searchStart: number = 0
     ): [number, number, string] | null {
         const regionStartIndex = template.indexOf(
-            ChaffEditorProvider.REGION_START_STRING,
+            ChaffEditorProvider.regionStartString,
             searchStart
         );
 
@@ -186,14 +203,13 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
         }
 
         const regionEndIndex = template.indexOf(
-            ChaffEditorProvider.REGION_END_STRING,
+            ChaffEditorProvider.regionEndString,
             regionStartIndex
         );
 
         const regionName = template
             .slice(
-                regionStartIndex +
-                    ChaffEditorProvider.REGION_START_STRING.length,
+                regionStartIndex + ChaffEditorProvider.regionStartString.length,
                 template.indexOf("\n", regionStartIndex)
             )
             .trim();
@@ -220,7 +236,7 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
             );
 
             fileContents = fileContents.slice(
-                regionEndIndex + ChaffEditorProvider.REGION_END_STRING.length
+                regionEndIndex + ChaffEditorProvider.regionEndString.length
             );
         }
     }
@@ -249,8 +265,7 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
 
             if (!replacements.has(regionName)) {
                 searchStart =
-                    regionEndIndex +
-                    ChaffEditorProvider.REGION_END_STRING.length;
+                    regionEndIndex + ChaffEditorProvider.regionEndString.length;
                 continue;
             }
 
@@ -262,12 +277,11 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
                 templateContents.slice(0, regionStartIndex) +
                 replacement +
                 templateContents.slice(
-                    regionEndIndex +
-                        ChaffEditorProvider.REGION_END_STRING.length
+                    regionEndIndex + ChaffEditorProvider.regionEndString.length
                 );
 
             searchStart =
-                regionEndIndex + ChaffEditorProvider.REGION_END_STRING.length;
+                regionEndIndex + ChaffEditorProvider.regionEndString.length;
         }
     }
 }

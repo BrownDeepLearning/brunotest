@@ -12,3 +12,19 @@ code {
     line-height: calc(var(--vscode-editor-font-size) * 1.5);
     font-family: var(--vscode-editor-font-family);
 }
+
+select {
+    background-color: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    border-color: var(--vscode-dropdown-border);
+    font-family: inherit;
+    font-size: 2em;
+}
+
+select:focus {
+    outline-width: 1px;
+    outline-style: solid;
+    outline-offset: -1px;
+    outline-color: var(--vscode-focusBorder);
+    opacity: 1;
+}

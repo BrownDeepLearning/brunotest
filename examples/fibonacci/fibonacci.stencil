@@ -7,5 +7,5 @@ return None
 ### EndRegion
 
 ### Region: factorial.call
-pass
+raise NotImplementedError("LOL")
 ### EndRegion
