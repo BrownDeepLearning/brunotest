@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { getHighlighter } from "shiki";
 import { getNonce } from "./util";
 
 export class StencilChaffEditorProvider
@@ -32,17 +33,17 @@ export class StencilChaffEditorProvider
         vscode.window.showTextDocument(document, vscode.ViewColumn.One);
 
         // Create and show the webview panel
-        webviewPanel.webview.html = this.getHTMLForWebview(
+        webviewPanel.webview.html = await this.getHTMLForWebview(
             document,
             webviewPanel.webview
         );
         webviewPanel.reveal(vscode.ViewColumn.Two);
 
         const changeDocumentSubscription =
-            vscode.workspace.onDidChangeTextDocument((e) => {
+            vscode.workspace.onDidChangeTextDocument(async (e) => {
                 // this event is fired when the webview changes as well, so this prevents an infinite loop
                 if (e.document.uri.toString() === document.uri.toString()) {
-                    webviewPanel.webview.html = this.getHTMLForWebview(
+                    webviewPanel.webview.html = await this.getHTMLForWebview(
                         document,
                         webviewPanel.webview
                     );
@@ -55,53 +56,35 @@ export class StencilChaffEditorProvider
         });
     }
 
-    private getHTMLForWebview(
+    private async getHTMLForWebview(
         document: vscode.TextDocument,
         webview: vscode.Webview
-    ): string {
-        const prismJsUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(
-                this.context.extensionUri,
-                "assets",
-                "prism",
-                "prism.js"
-            )
-        );
-
-        const prismCssUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(
-                vscode.Uri.joinPath(
-                    this.context.extensionUri,
-                    "assets",
-                    "prism",
-                    "prism.css"
-                )
-            )
+    ): Promise<string> {
+        const webviewCssUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this.context.extensionUri, "src", "webview.css")
         );
 
         const nonce = getNonce();
+
+        const isDarkMode =
+            vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
+        const highlightTheme = isDarkMode ? "github-dark" : "github-light";
 
         return `
         <!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${
-                webview.cspSource
-            }; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-            <link rel="stylesheet" href="${prismCssUri}" />
+            <link rel="stylesheet" href="${webviewCssUri}" />
             <title>Brunotest Preview</title>
         </head>
         <body>
-            <pre id="view">
-                <code class="language-py">
-${document.getText()}
-                </code>
-            </pre>
-
-            <script nonce="${nonce}" src="${prismJsUri}"></script>
+            ${(await getHighlighter({ theme: highlightTheme })).codeToHtml(
+                document.getText(),
+                { lang: "python" }
+            )}
         </body>
         </html>
         `;

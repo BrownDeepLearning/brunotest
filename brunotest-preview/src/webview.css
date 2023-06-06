@@ -1,0 +1,14 @@
+html {
+    color: var(--vscode-textPreformat-foreground);
+}
+
+pre {
+    background-color: var(--vscode-editor-background) !important;
+}
+
+code {
+    background-color: var(--vscode-editor-background);
+    font-size: var(--vscode-editor-font-size);
+    line-height: calc(var(--vscode-editor-font-size) * 1.5);
+    font-family: var(--vscode-editor-font-family);
+}
