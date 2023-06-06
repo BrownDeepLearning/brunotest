@@ -10,6 +10,8 @@ export class StencilChaffEditorProvider
 
     //* NOTE: Must match the name exposed in package.json *//
     public static readonly viewType = "brunotest-preview.stencilchaff";
+    public static readonly REGION_START_STRING = "### Region: ";
+    public static readonly REGION_END_STRING = "### EndRegion";
 
     public static register(
         context: vscode.ExtensionContext
@@ -45,7 +47,6 @@ export class StencilChaffEditorProvider
 
         const changeDocumentSubscription =
             vscode.workspace.onDidChangeTextDocument(async (e) => {
-                // this event is fired when the webview changes as well, so this prevents an infinite loop
                 if (e.document.uri.toString() === document.uri.toString()) {
                     this.getHTMLForWebview(
                         document,
@@ -74,7 +75,7 @@ export class StencilChaffEditorProvider
     }
 
     private async getHTMLForWebview(
-        document: vscode.TextDocument,
+        chaffDocument: vscode.TextDocument,
         webview: vscode.Webview,
         selectedDocument?: string
     ): Promise<string> {
@@ -82,8 +83,7 @@ export class StencilChaffEditorProvider
             vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
         const highlightTheme = isDarkMode ? "github-dark" : "github-light";
 
-        const codeDirectory = join(dirname(document.uri.fsPath), "code");
-
+        const codeDirectory = join(dirname(chaffDocument.uri.fsPath), "code");
         if (!existsSync(codeDirectory)) {
             return this.wrapHTMLBoilerplate(
                 webview,
@@ -130,13 +130,19 @@ export class StencilChaffEditorProvider
             "utf-8"
         );
 
-        const x = this.wrapHTMLBoilerplate(
+        const replacements = this.parseChaffFile(chaffDocument.getText());
+        const modifiedFileContents = this.compileTemplateFile(
+            selectedFileContents,
+            replacements
+        );
+
+        return this.wrapHTMLBoilerplate(
             webview,
             `
             ${fileDropdown}
             ${await getHighlighter({ theme: highlightTheme })
                 .then((highligher) =>
-                    highligher.codeToHtml(selectedFileContents, {
+                    highligher.codeToHtml(modifiedFileContents, {
                         lang: "python",
                     })
                 )
@@ -144,8 +150,6 @@ export class StencilChaffEditorProvider
             ${dropdownEventListener}
             `
         );
-
-        return x;
     }
 
     private wrapHTMLBoilerplate(webview: vscode.Webview, html: string) {
@@ -168,5 +172,106 @@ export class StencilChaffEditorProvider
         </body>
         </html>
         `;
+    }
+
+    private findRegion(
+        template: string,
+        searchStart: number = 0
+    ): [number, number, string] | null {
+        const regionStartIndex = template.indexOf(
+            StencilChaffEditorProvider.REGION_START_STRING,
+            searchStart
+        );
+
+        if (regionStartIndex === -1) {
+            return null;
+        }
+
+        const regionEndIndex = template.indexOf(
+            StencilChaffEditorProvider.REGION_END_STRING,
+            regionStartIndex
+        );
+
+        const regionName = template
+            .slice(
+                regionStartIndex +
+                    StencilChaffEditorProvider.REGION_START_STRING.length,
+                template.indexOf("\n", regionStartIndex)
+            )
+            .trim();
+
+        return [regionStartIndex, regionEndIndex, regionName];
+    }
+
+    private parseChaffFile(fileContents: string) {
+        const replacements = new Map();
+
+        while (true) {
+            const region = this.findRegion(fileContents);
+            if (!region) {
+                return replacements;
+            }
+
+            const [regionStartIndex, regionEndIndex, regionName] = region;
+            const nextLineIdx =
+                fileContents.indexOf("\n", regionStartIndex) + 1;
+
+            replacements.set(
+                regionName,
+                fileContents.slice(nextLineIdx, regionEndIndex).trim()
+            );
+
+            fileContents = fileContents.slice(
+                regionEndIndex +
+                    StencilChaffEditorProvider.REGION_END_STRING.length
+            );
+        }
+    }
+
+    private compileTemplateFile(
+        templateContents: string,
+        replacements: Map<string, string>
+    ) {
+        let searchStart = 0;
+        while (true) {
+            const region = this.findRegion(templateContents, searchStart);
+
+            if (!region) {
+                return templateContents;
+            }
+
+            const [regionStartIndex, regionEndIndex, regionName] = region;
+            const lastNewlineIdx = templateContents.lastIndexOf(
+                "\n",
+                regionStartIndex
+            );
+            const indentation = templateContents.slice(
+                lastNewlineIdx + 1,
+                regionStartIndex
+            );
+
+            if (!replacements.has(regionName)) {
+                searchStart =
+                    regionEndIndex +
+                    StencilChaffEditorProvider.REGION_END_STRING.length;
+                continue;
+            }
+
+            const replacement = replacements
+                .get(regionName)
+                ?.replaceAll("\n", "\n" + indentation);
+
+            templateContents =
+                templateContents.slice(0, regionStartIndex) +
+                replacement +
+                templateContents.slice(
+                    regionEndIndex +
+                        StencilChaffEditorProvider.REGION_END_STRING.length
+                );
+
+            searchStart =
+                regionEndIndex +
+                StencilChaffEditorProvider.REGION_END_STRING.length;
+        }
     }
 }
