@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
-import { StencilChaffEditorProvider } from "./StencilChaffEditor";
+import { ChaffEditorProvider } from "./ChaffEditor";
 
 export function activate(context: vscode.ExtensionContext) {
-    context.subscriptions.push(StencilChaffEditorProvider.register(context));
+    context.subscriptions.push(ChaffEditorProvider.register(context));
 }
 
 export function deactivate() {}

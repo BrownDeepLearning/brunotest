@@ -14,8 +14,8 @@
     "contributes": {
         "customEditors": [
             {
-                "viewType": "brunotest-preview.stencilchaff",
-                "displayName": "Stencil/Chaff",
+                "viewType": "brunotest-preview.chaff",
+                "displayName": "Chaff",
                 "selector": [
                     {
                         "filenamePattern": "*.stencil"

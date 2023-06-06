@@ -3,22 +3,20 @@ import { getHighlighter } from "shiki";
 import { dirname, join } from "path";
 import { existsSync, readFileSync, readdirSync } from "fs";
 
-export class StencilChaffEditorProvider
-    implements vscode.CustomTextEditorProvider
-{
+export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
     constructor(private readonly context: vscode.ExtensionContext) {}
 
     //* NOTE: Must match the name exposed in package.json *//
-    public static readonly viewType = "brunotest-preview.stencilchaff";
+    public static readonly viewType = "brunotest-preview.chaff";
     public static readonly REGION_START_STRING = "### Region: ";
     public static readonly REGION_END_STRING = "### EndRegion";
 
     public static register(
         context: vscode.ExtensionContext
     ): vscode.Disposable {
-        const provider = new StencilChaffEditorProvider(context);
+        const provider = new ChaffEditorProvider(context);
         return vscode.window.registerCustomEditorProvider(
-            StencilChaffEditorProvider.viewType,
+            ChaffEditorProvider.viewType,
             provider
         );
     }
@@ -179,7 +177,7 @@ export class StencilChaffEditorProvider
         searchStart: number = 0
     ): [number, number, string] | null {
         const regionStartIndex = template.indexOf(
-            StencilChaffEditorProvider.REGION_START_STRING,
+            ChaffEditorProvider.REGION_START_STRING,
             searchStart
         );
 
@@ -188,14 +186,14 @@ export class StencilChaffEditorProvider
         }
 
         const regionEndIndex = template.indexOf(
-            StencilChaffEditorProvider.REGION_END_STRING,
+            ChaffEditorProvider.REGION_END_STRING,
             regionStartIndex
         );
 
         const regionName = template
             .slice(
                 regionStartIndex +
-                    StencilChaffEditorProvider.REGION_START_STRING.length,
+                    ChaffEditorProvider.REGION_START_STRING.length,
                 template.indexOf("\n", regionStartIndex)
             )
             .trim();
@@ -222,8 +220,7 @@ export class StencilChaffEditorProvider
             );
 
             fileContents = fileContents.slice(
-                regionEndIndex +
-                    StencilChaffEditorProvider.REGION_END_STRING.length
+                regionEndIndex + ChaffEditorProvider.REGION_END_STRING.length
             );
         }
     }
@@ -253,7 +250,7 @@ export class StencilChaffEditorProvider
             if (!replacements.has(regionName)) {
                 searchStart =
                     regionEndIndex +
-                    StencilChaffEditorProvider.REGION_END_STRING.length;
+                    ChaffEditorProvider.REGION_END_STRING.length;
                 continue;
             }
 
@@ -266,12 +263,11 @@ export class StencilChaffEditorProvider
                 replacement +
                 templateContents.slice(
                     regionEndIndex +
-                        StencilChaffEditorProvider.REGION_END_STRING.length
+                        ChaffEditorProvider.REGION_END_STRING.length
                 );
 
             searchStart =
-                regionEndIndex +
-                StencilChaffEditorProvider.REGION_END_STRING.length;
+                regionEndIndex + ChaffEditorProvider.REGION_END_STRING.length;
         }
     }
 }
