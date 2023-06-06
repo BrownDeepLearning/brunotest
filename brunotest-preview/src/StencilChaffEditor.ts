@@ -6,6 +6,7 @@ export class StencilChaffEditorProvider
 {
     constructor(private readonly context: vscode.ExtensionContext) {}
 
+    //* NOTE: Must match the name exposed in package.json *//
     public static readonly viewType = "brunotest-preview.stencilchaff";
 
     public static register(
@@ -35,8 +36,23 @@ export class StencilChaffEditorProvider
             document,
             webviewPanel.webview
         );
-
         webviewPanel.reveal(vscode.ViewColumn.Two);
+
+        const changeDocumentSubscription =
+            vscode.workspace.onDidChangeTextDocument((e) => {
+                // this event is fired when the webview changes as well, so this prevents an infinite loop
+                if (e.document.uri.toString() === document.uri.toString()) {
+                    webviewPanel.webview.html = this.getHTMLForWebview(
+                        document,
+                        webviewPanel.webview
+                    );
+                }
+            });
+
+        // Make sure we get rid of the listener when our editor is closed.
+        webviewPanel.onDidDispose(() => {
+            changeDocumentSubscription.dispose();
+        });
     }
 
     private getHTMLForWebview(
@@ -79,8 +95,7 @@ export class StencilChaffEditorProvider
             <title>Brunotest Preview</title>
         </head>
         <body>
-            <h1>Brunotest Editor Preview</h1>
-            <pre style="background-color: red;">
+            <pre id="view">
                 <code class="language-py">
 ${document.getText()}
                 </code>
@@ -88,7 +103,7 @@ ${document.getText()}
 
             <script nonce="${nonce}" src="${prismJsUri}"></script>
         </body>
-        </html
+        </html>
         `;
     }
 }
