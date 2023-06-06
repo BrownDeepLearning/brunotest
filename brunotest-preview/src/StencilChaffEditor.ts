@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import { getHighlighter } from "shiki";
-import { getNonce } from "./util";
 
 export class StencilChaffEditorProvider
     implements vscode.CustomTextEditorProvider
@@ -25,17 +24,17 @@ export class StencilChaffEditorProvider
         webviewPanel: vscode.WebviewPanel,
         _token: vscode.CancellationToken
     ): Promise<void> {
+        // Open the document in the default text editor
+        const srcDir = vscode.Uri.joinPath(this.context.extensionUri, "src");
         webviewPanel.webview.options = {
-            enableScripts: true,
+            localResourceRoots: [srcDir],
         };
 
-        // Open the document in the default text editor
         vscode.window.showTextDocument(document, vscode.ViewColumn.One);
 
         // Create and show the webview panel
-        webviewPanel.webview.html = await this.getHTMLForWebview(
-            document,
-            webviewPanel.webview
+        this.getHTMLForWebview(document, webviewPanel.webview).then(
+            (html) => (webviewPanel.webview.html = html)
         );
         webviewPanel.reveal(vscode.ViewColumn.Two);
 
@@ -43,9 +42,8 @@ export class StencilChaffEditorProvider
             vscode.workspace.onDidChangeTextDocument(async (e) => {
                 // this event is fired when the webview changes as well, so this prevents an infinite loop
                 if (e.document.uri.toString() === document.uri.toString()) {
-                    webviewPanel.webview.html = await this.getHTMLForWebview(
-                        document,
-                        webviewPanel.webview
+                    this.getHTMLForWebview(document, webviewPanel.webview).then(
+                        (html) => (webviewPanel.webview.html = html)
                     );
                 }
             });
@@ -63,8 +61,6 @@ export class StencilChaffEditorProvider
         const webviewCssUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this.context.extensionUri, "src", "webview.css")
         );
-
-        const nonce = getNonce();
 
         const isDarkMode =
             vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
