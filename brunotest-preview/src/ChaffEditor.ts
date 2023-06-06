@@ -1,15 +1,24 @@
 import * as vscode from "vscode";
 import { getHighlighter } from "shiki";
-import { dirname, join } from "path";
+import { basename, dirname, join } from "path";
 import { existsSync, readFileSync, readdirSync } from "fs";
+import { readdir } from "fs/promises";
 
 export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
     constructor(private readonly context: vscode.ExtensionContext) {}
 
     //* NOTE: Must match the name exposed in package.json *//
     public static readonly viewType = "brunotest-preview.chaff";
+
     public static readonly regionStartString = "### Region: ";
+
     public static readonly regionEndString = "### EndRegion";
+
+    public static readonly templateDirectory = "code";
+
+    public static readonly syntaxHighlightDarkTheme = "github-dark";
+
+    public static readonly syntaxHighlightLightTheme = "github-light";
 
     public static register(
         context: vscode.ExtensionContext
@@ -26,56 +35,93 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
         webviewPanel: vscode.WebviewPanel,
         _token: vscode.CancellationToken
     ): Promise<void> {
+        const subscriptions: vscode.Disposable[] = [];
+        const templateDirectory = join(
+            dirname(document.uri.fsPath),
+            ChaffEditorProvider.templateDirectory
+        );
         let selectedDocument: string | undefined = undefined;
 
-        // Open the document in the default text editor
-        const srcDir = vscode.Uri.joinPath(this.context.extensionUri, "src");
         webviewPanel.webview.options = {
             enableScripts: true,
-            localResourceRoots: [srcDir],
+            localResourceRoots: [
+                vscode.Uri.joinPath(this.context.extensionUri, "src"),
+            ],
         };
-
-        vscode.window.showTextDocument(document, vscode.ViewColumn.One);
 
         const updateWebview = () => {
             this.getHTMLForWebview(
                 document,
                 webviewPanel.webview,
+                templateDirectory,
                 selectedDocument
             ).then((html) => {
                 webviewPanel.webview.html = html;
-                console.log(webviewPanel.webview.html);
             });
         };
 
-        // Create and show the webview panel
-        updateWebview();
-        webviewPanel.reveal(vscode.ViewColumn.Two);
+        // Open the document in the default text editor
+        vscode.window.showTextDocument(document, vscode.ViewColumn.One);
 
-        const subscriptions: vscode.Disposable[] = [];
+        // Create and show the webview panel
+        webviewPanel.reveal(vscode.ViewColumn.Two);
+        updateWebview();
+
+        const inTemplateDirectory = (documentFsPath: vscode.Uri) => {
+            return (
+                dirname(documentFsPath.with({ scheme: "file" }).fsPath) ===
+                templateDirectory
+            );
+        };
+
+        const isThisChaffDocument = (documentURI: vscode.Uri) => {
+            return documentURI.toString() === document.uri.toString();
+        };
 
         subscriptions.push(
             vscode.workspace.onDidChangeTextDocument(async (e) => {
-                if (e.document.uri.toString() === document.uri.toString()) {
+                if (isThisChaffDocument(e.document.uri)) {
+                    updateWebview();
+                }
+            })
+        );
+
+        vscode.workspace.onDidSaveTextDocument(async (savedDocument) => {
+            if (inTemplateDirectory(savedDocument.uri)) {
+                updateWebview();
+            }
+        });
+
+        subscriptions.push(
+            vscode.workspace.onDidCreateFiles(async (e) => {
+                if (e.files.some((uri) => inTemplateDirectory(uri))) {
+                    // TODO: Check if nested directories is supported
                     updateWebview();
                 }
             })
         );
 
         subscriptions.push(
-            vscode.workspace.onDidCloseTextDocument(async (e) => {})
+            vscode.workspace.onDidDeleteFiles(async (e) => {
+                if (e.files.some((uri) => inTemplateDirectory(uri))) {
+                    // TODO: Handle the case where you delete the file you are currently viewing
+                    updateWebview();
+                }
+            })
         );
 
-        subscriptions.push(vscode.workspace.onDidCreateFiles(async (e) => {}));
-
-        subscriptions.push(vscode.workspace.onDidDeleteFiles(async (e) => {}));
-
-        subscriptions.push(vscode.workspace.onDidRenameFiles(async (e) => {}));
+        subscriptions.push(
+            vscode.workspace.onDidRenameFiles(async (e) => {
+                if (e.files.some(({ newUri }) => inTemplateDirectory(newUri))) {
+                    // TODO: Update the selected document name
+                    updateWebview();
+                }
+            })
+        );
 
         webviewPanel.webview.onDidReceiveMessage((message) => {
             switch (message.command) {
                 case "selectedFileChange":
-                    console.log("selectedFileChange");
                     selectedDocument = message.selectedDocument;
                     updateWebview();
             }
@@ -87,37 +133,57 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
         });
     }
 
+    private walk(dirName: string): string[] {
+        const files = [];
+        const items = readdirSync(dirName, { withFileTypes: true });
+
+        for (const item of items) {
+            if (item.isDirectory()) {
+                files.push(...this.walk(`${dirName}/${item.name}`));
+            } else {
+                files.push(`${dirName}/${item.name}`);
+            }
+        }
+
+        return files;
+    }
+
     private async getHTMLForWebview(
         chaffDocument: vscode.TextDocument,
         webview: vscode.Webview,
+        templateDirectory: string,
         selectedDocument?: string
     ): Promise<string> {
         const isDarkMode =
             vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
-        const highlightTheme = isDarkMode ? "github-dark" : "github-light";
+        const highlightTheme = isDarkMode
+            ? ChaffEditorProvider.syntaxHighlightDarkTheme
+            : ChaffEditorProvider.syntaxHighlightLightTheme;
 
-        const codeDirectory = join(dirname(chaffDocument.uri.fsPath), "code");
-        if (!existsSync(codeDirectory)) {
+        if (!existsSync(templateDirectory)) {
             return this.wrapHTMLBoilerplate(
                 webview,
                 "<h1>No <code>code</code> directory found!</h1>"
             );
         }
 
-        const dropdownOptions = readdirSync(codeDirectory).map(
-            (file) =>
-                `<option ${
-                    selectedDocument === file ? "selected" : ""
-                }>${file}</option>`
-        );
+        const dropdownOptions = this.walk(templateDirectory)
+            .map((file) => file.replace(`${templateDirectory}/`, ""))
+            .map(
+                (file) =>
+                    `<option ${
+                        selectedDocument === file ? "selected" : ""
+                    }>${file}</option>`
+            );
+
         const fileDropdown = `
             <select id="file-dropdown" class="monaco-select-box monaco-select-box-dropdown-padding">
                 <option disabled ${
                     selectedDocument ? "" : "selected"
                 }>Choose File!</option>
                 ${dropdownOptions.join("\n")}
-            </select>
-        </div>`;
+            </select>`;
+
         const dropdownEventListener = `
         <script>
             const vscode = acquireVsCodeApi();
@@ -129,8 +195,7 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
                     selectedDocument: dropdown.value
                 });
             });
-        </script>
-        `;
+        </script>`;
 
         if (!selectedDocument) {
             return this.wrapHTMLBoilerplate(
@@ -140,11 +205,12 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
         }
 
         const selectedFileContents = readFileSync(
-            join(codeDirectory, selectedDocument),
+            join(templateDirectory, selectedDocument),
             "utf-8"
         );
 
         const replacements = this.parseChaffFile(chaffDocument.getText());
+
         const modifiedFileContents = this.compileTemplateFile(
             selectedFileContents,
             replacements
@@ -153,6 +219,7 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
         return this.wrapHTMLBoilerplate(
             webview,
             `
+            ${fileDropdown}
             ${await getHighlighter({ theme: highlightTheme })
                 .then((highligher) =>
                     highligher.codeToHtml(modifiedFileContents, {
@@ -160,7 +227,6 @@ export class ChaffEditorProvider implements vscode.CustomTextEditorProvider {
                     })
                 )
                 .catch((err) => console.error(err))}
-            ${fileDropdown}
             ${dropdownEventListener}
             `
         );
