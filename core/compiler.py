@@ -1,5 +1,10 @@
+"""
+This module contains the compiler logic for Brunotest, which determines
+how solution code and chaff files get transformed into partial implementations.
+"""
+
 from dataclasses import dataclass
-import re
+from typing import Optional
 
 REGION_START_STRING = "### Region: "
 REGION_START_STRING_LENGTH = len(REGION_START_STRING)
@@ -15,7 +20,10 @@ class FileCompilationResult:
     regions: list[str]
 
 
-def find_region(template: str, search_start: str = 0) -> tuple[int, int, str] | None:
+def find_region(template: str, search_start: int = 0) -> Optional[tuple[int, int, str]]:
+    """
+    Finds the next region in the template file, starting at the given index.
+    """
     region_start_index = template.find(REGION_START_STRING, search_start)
 
     if region_start_index == -1:
@@ -34,13 +42,13 @@ def compile_file(
     template_file_path: str,
     new_file_path: str,
     replacements: dict[str, str],
-) -> FileCompilationResult:
+) -> None:
     """
     Reads and compiles a template file, writing the result to a new file.
     """
 
     # Read the template file
-    with open(template_file_path, "r") as template_file:
+    with open(template_file_path, "r", encoding="utf-8") as template_file:
         template = template_file.read()
 
     # Find all the regions in the template
@@ -53,8 +61,10 @@ def compile_file(
 
         (region_start_index, region_end_index, region_name) = region
 
-        # Have located the region, so now replace it with the contents of the region that are defined in `replacements`
-        # Note: We will need to figure out the amount of indentation that the region has, and then indent the replacement accordingly
+        # Have located the region, so now replace it with the contents of the region
+        # that are defined in `replacements`
+        # Note: We will need to figure out the amount of indentation that the region has,
+        # and then indent the replacement accordingly
         # Find the index of the last newline before region_start_index
         last_newline_index = template.rfind("\n", 0, region_start_index)
         indentation = template[last_newline_index + 1 : region_start_index]
@@ -74,16 +84,19 @@ def compile_file(
         )
 
     # Write the template back to file
-    with open(new_file_path, "w") as new_file:
+    with open(new_file_path, "w", encoding="utf-8") as new_file:
         new_file.write(template)
 
 
-def read_chaff_file(chaff_file_path: str) -> dict[str, str]:
+def read_chaff_file(chaff_file_path: Optional[str]) -> dict[str, str]:
     """
     Reads a chaff file and creates a mapping between regions and their replacements.
     """
     # Read the chaff file
-    with open(chaff_file_path, "r") as chaff_file:
+    if not chaff_file_path:
+        return {}
+
+    with open(chaff_file_path, "r", encoding="utf-8") as chaff_file:
         chaff = chaff_file.read()
 
     replacements = {}
@@ -100,14 +113,3 @@ def read_chaff_file(chaff_file_path: str) -> dict[str, str]:
         chaff = chaff[region_end_index + REGION_END_STRING_LENGTH :]
 
     return replacements
-
-
-import sys
-
-if __name__ == "__main__":
-    # Get the first command line argument
-    template_file_path = sys.argv[1]
-
-    replacements = read_chaff_file("..\\examples\\fibonacci\\off_by_one.chaff")
-
-    compile_file(template_file_path, "test_file.py", replacements)

@@ -1,9 +1,14 @@
+"""
+This module contains core logic for the brunotest CLI appliance.
+"""
+
+from dataclasses import dataclass
 import os
-import click
 import shutil
+from typing import Optional
+import click
 import pytest
 from core import compiler, imports
-from dataclasses import dataclass
 
 BRUNOTEST_DIR = "__brunotest__"
 CODE_DIR = "code"
@@ -47,8 +52,8 @@ def remove_all(path: str, remove_dir: bool = True) -> None:
     for root, dirs, files in os.walk(path, topdown=False):
         for file in files:
             os.remove(os.path.join(root, file))
-        for dir in dirs:
-            shutil.rmtree(os.path.join(root, dir))
+        for directory in dirs:
+            shutil.rmtree(os.path.join(root, directory))
 
     if remove_dir and os.path.isdir(path):
         os.rmdir(path)
@@ -84,9 +89,11 @@ def find_stencil(directory: str) -> str:
     stencil_entries = [entry for entry in entries if entry.endswith(".stencil")]
 
     if len(stencil_entries) == 0:
-        raise Exception("No stencil file found in the root of the directory.")
-    elif len(stencil_entries) > 1:
-        raise Exception("Multiple stencil files found in the root of the directory.")
+        raise FileNotFoundError("No stencil file found in the root of the directory.")
+    if len(stencil_entries) > 1:
+        raise FileNotFoundError(
+            "Multiple stencil files found in the root of the directory."
+        )
 
     return os.path.join(directory, stencil_entries[0])
 
@@ -97,7 +104,7 @@ def find_chaff_paths(directory: str) -> list[str]:
     """
     chaff_paths = []
 
-    for root, dirs, files in os.walk(directory):
+    for root, _, files in os.walk(directory):
         for file in files:
             if file.endswith(".chaff"):
                 chaff_paths.append(os.path.join(root, file))
@@ -106,7 +113,7 @@ def find_chaff_paths(directory: str) -> list[str]:
 
 
 def compile_to_directory(
-    code_path: str, chaff_path: str, output_directory: str
+    code_path: str, chaff_path: Optional[str], output_directory: str
 ) -> None:
     """
     Compiles all of the template files from `code_path` to the specified output directory.
@@ -115,9 +122,9 @@ def compile_to_directory(
     chaff_replacements = compiler.read_chaff_file(chaff_path)
 
     for root, dirs, files in os.walk(code_path):
-        for dir in dirs:
+        for directory in dirs:
             # Make the directory in the output directory
-            os.mkdir(os.path.join(output_directory, dir))
+            os.mkdir(os.path.join(output_directory, directory))
         for file in files:
             compiler.compile_file(
                 os.path.join(root, file),
@@ -130,7 +137,7 @@ FAILURE_PREFIX = "### Fails:"
 FAILURE_PREFIX_LEN = len(FAILURE_PREFIX)
 
 
-def get_chaff_expected_test_failures(chaff_path: str | None) -> set[str]:
+def get_chaff_expected_test_failures(chaff_path: Optional[str]) -> set[str]:
     """
     Reads the chaff file and returns a set of all of the expected test failures.
 
@@ -146,8 +153,8 @@ def get_chaff_expected_test_failures(chaff_path: str | None) -> set[str]:
 
     print(chaff_path)
     # Read the chaff file
-    with open(chaff_path, "r") as f:
-        chaff_lines = f.readlines()
+    with open(chaff_path, "r", encoding="utf-8") as file:
+        chaff_lines = file.readlines()
 
     expected_test_failures = set()
 
@@ -168,8 +175,8 @@ class BrunotestPytestPlugin:
     def __init__(
         self,
     ):
-        self.test_outputs = dict()
-        self.test_stdout = dict()
+        self.test_outputs = {}
+        self.test_stdout = {}
         self.passed_tests = set()
         self.failed_tests = set()
 
@@ -216,11 +223,15 @@ class BrunotestAutograderResult:
 
 
 def simulate_autograder(
-    absolute_chaff_path: str | None,
+    absolute_chaff_path: Optional[str],
     chaff_name: str,
     absolute_solution_path: str,
     absolute_path_to_tests: str,
 ) -> BrunotestAutograderResult:
+    """
+    Simulates the autograder, running the tests on the chaff
+    and checking if the expected tests fail.
+    """
     current_dir = os.path.abspath(os.getcwd())
     absolute_brunotest_dir = os.path.abspath(BRUNOTEST_DIR)
     autograder_path = os.path.join(absolute_brunotest_dir, "autograder")
@@ -282,7 +293,9 @@ def simulate_autograder(
 
 
 def summarize_test_result(autograder_test: BrunotestAutograderResult) -> None:
-    """ """
+    """
+    Summarizes the given autograder result to the console.
+    """
     if autograder_test.passed:
         click.echo(
             click.style(
@@ -336,8 +349,8 @@ def summarize_test_result(autograder_test: BrunotestAutograderResult) -> None:
     type=click.Path(),
     help="The directory to compile and output the results to",
 )
-def brunotest_cli_entry(
-    chaffs: list[str], directory: str, compile_dir: str | None, run_all: bool
+def brunotest_cli_entry(  # pylint: disable=too-many-locals
+    chaffs: list[str], directory: str, compile_dir: Optional[str], run_all: bool
 ):
     """
     The entry point for the brunotest command line executable.
@@ -348,7 +361,7 @@ def brunotest_cli_entry(
     chaff_names = [
         os.path.basename(chaff_path).split(".")[0] for chaff_path in chaff_paths
     ]
-    chaff_path_name = (
+    chaff_path_name: list[tuple[Optional[str], str]] = (
         list(zip(chaff_paths, chaff_names))
         + [(stencil_path, "stencil")]
         + [(None, "solution")]
@@ -362,7 +375,7 @@ def brunotest_cli_entry(
     ]
 
     if len(chaff_path_name) == 0:
-        raise Exception("No chaffs specified.")
+        raise FileNotFoundError("No chaffs specified.")
 
     if compile_dir is not None:
         # Only compile the code, don't run any tests.
@@ -423,4 +436,4 @@ def brunotest_cli_entry(
 
 
 if __name__ == "__main__":
-    brunotest_cli_entry()
+    brunotest_cli_entry(None, None, None, None)  # type: ignore

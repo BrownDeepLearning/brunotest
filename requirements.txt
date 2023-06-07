@@ -1,1 +1,4 @@
 click
+gradescope_utils
+setuptools
+pytest
