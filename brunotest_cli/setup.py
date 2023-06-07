@@ -12,8 +12,8 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 setup(
     name="brunotest",
     version="0.1",
-    author="Robert Scheidegger",
-    author_email="robert_scheidegger@brown.edu",
+    author="Brown Deep Learning Staff",
+    author_email="cs1470htas@brown.edu",
     license="MIT",
     description="CLI tool for robust autograder chaff testing",
     long_description=long_description,
