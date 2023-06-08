@@ -2,16 +2,17 @@
 Setup for the `brunotest` package.
 """
 
+import os
 from setuptools import setup, find_packages
 
-with open("README.md", "r", encoding="utf-8") as fh:
+with open(os.path.abspath(os.path.join(__file__, "README.md")), "r", encoding="utf-8") as fh:
     long_description = fh.read()
-with open("requirements.txt", "r", encoding="utf-8") as fh:
+with open(os.path.abspath(os.path.join(__file__, "requirements.txt")), "r", encoding="utf-8") as fh:
     requirements = fh.read()
 
 setup(
     name="brunotest",
-    version="0.1",
+    version="0.1.1",
     author="Brown Deep Learning Staff",
     author_email="cs1470htas@brown.edu",
     license="MIT",
