@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Change directory to CLI
+      run: cd brunotest_cli
     - uses: actions/checkout@v3
     - name: Set up Python
       uses: actions/setup-python@v3
