@@ -5,9 +5,12 @@ Setup for the `brunotest` package.
 import os
 from setuptools import setup, find_packages
 
-with open(os.path.abspath(os.path.join(__file__, "README.md")), "r", encoding="utf-8") as fh:
+current_directory = os.path.abspath(os.path.dirname(__file__))
+
+with open(os.path.join(current_directory, "README.md"), "r", encoding="utf-8") as fh:
     long_description = fh.read()
-with open(os.path.abspath(os.path.join(__file__, "requirements.txt")), "r", encoding="utf-8") as fh:
+
+with open(os.path.join(current_directory, "requirements.txt"), "r", encoding="utf-8") as fh:
     requirements = fh.read()
 
 setup(
