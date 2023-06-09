@@ -23,8 +23,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Change directory to CLI
-      run: cd brunotest_cli
     - uses: actions/checkout@v3
     - name: Change directory to CLI
       run: cd brunotest_cli
@@ -35,7 +33,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r brunotest_cli/requirements.txt
+        pip install -r requirements.txt
         pip install build
     - name: Build package
       run: python -m build
