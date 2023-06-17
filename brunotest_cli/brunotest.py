@@ -4,6 +4,7 @@ This module contains core logic for the brunotest CLI appliance.
 
 from dataclasses import dataclass
 import os
+import json as js
 import shutil
 from typing import Optional
 import click
@@ -339,9 +340,45 @@ def summarize_test_result(autograder_test: BrunotestAutograderResult) -> None:
             click.echo(autograder_test.test_stdout[unexpected_success])
 
 
+def print_test_results_to_json(
+    test_results: list[BrunotestAutograderResult], json_path: str
+) -> None:
+    """
+    Writes the test results to a new json file at `json_path`.
+    """
+
+    # Write the results to a json file
+    with open(json_path, "w", encoding="utf-8") as json_file:
+        js.dump(
+            [
+                {
+                    "chaff_name": test_result.chaff_name,
+                    "passed": test_result.passed,
+                    "tests_failed_unexpectedly": list(
+                        test_result.tests_failed_unexpectedly
+                    ),
+                    "tests_passed_unexpectedly": list(
+                        test_result.tests_passed_unexpectedly
+                    ),
+                    "test_details": test_result.test_details,
+                    "test_stdout": test_result.test_stdout,
+                }
+                for test_result in test_results
+            ],
+            json_file,
+            indent=4,
+        )
+
+
 @click.command()
 @click.argument("chaffs", nargs=-1)
 @click.option("--directory", "--dir", "-d", type=click.Path(exists=True))
+@click.option(
+    "--json",
+    "-j",
+    type=click.Path(exists=False, dir_okay=False),
+    help="Print the stdout of the tests Only valid when -c is specified.",
+)
 @click.option("--run_all", "-a", is_flag=True, help="Run all chaffs", default=False)
 @click.option(
     "compile_dir",
@@ -350,7 +387,11 @@ def summarize_test_result(autograder_test: BrunotestAutograderResult) -> None:
     help="The directory to compile and output the results to",
 )
 def brunotest_cli_entry(  # pylint: disable=too-many-locals
-    chaffs: list[str], directory: str, compile_dir: Optional[str], run_all: bool
+    chaffs: list[str],
+    directory: str,
+    compile_dir: Optional[str],
+    run_all: bool,
+    json: Optional[str],
 ):
     """
     The entry point for the brunotest command line executable.
@@ -410,7 +451,7 @@ def brunotest_cli_entry(  # pylint: disable=too-many-locals
     absolute_test_path = os.path.abspath(os.path.join(directory, "tests"))
     try:
         # Compile all of the specified chaffs to the testing directory
-        test_results = []
+        test_results: list[BrunotestAutograderResult] = []
         for chaff_path, chaff_name in chaff_path_name:
             absolute_chaff_path = (
                 os.path.abspath(chaff_path) if chaff_path is not None else None
@@ -428,6 +469,10 @@ def brunotest_cli_entry(  # pylint: disable=too-many-locals
         for test_result in test_results:
             summarize_test_result(test_result)
 
+        # Output the results to a json file if specified
+        if json is not None:
+            print_test_results_to_json(test_results, json)
+
         cleanup_brunotest_dir()
     except Exception as exception:
         os.chdir(original_dir)
@@ -436,4 +481,4 @@ def brunotest_cli_entry(  # pylint: disable=too-many-locals
 
 
 if __name__ == "__main__":
-    brunotest_cli_entry(None, None, None, None)  # type: ignore
+    brunotest_cli_entry(None, None, None, None, None)  # type: ignore
