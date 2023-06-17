@@ -19,7 +19,7 @@ setup(
     description="CLI tool for robust autograder chaff testing",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/Brown-Deep-Learning/brunotest",
+    url="https://github.com/BrownDeepLearning/brunotest",
     py_modules=["brunotest"],
     packages=find_packages(),
     install_requires=[requirements],
