@@ -10,9 +10,12 @@ with open("README.md", "r", encoding="utf-8") as fh:
 with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = fh.read()
 
+with open("version.txt", "r", encoding="utf-8") as fh:
+    version = fh.read()
+
 setup(
     name="brunotest",
-    version="0.1.1",
+    version="0.1.1." + version,
     author="Brown Deep Learning Staff",
     author_email="cs1470htas@brown.edu",
     license="MIT",
